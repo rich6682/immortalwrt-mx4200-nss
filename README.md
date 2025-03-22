@@ -1,6 +1,6 @@
 # Qualcommax NSS Builder
 
-This project automates the process of building OpenWrt firmware images for the Qualcomm IPQ807x platform, specifically targeting the Xiaomi AX3600 router. The build process incorporates various optimizations, hardening options, and quality-of-life enhancements. 
+This project automates the process of building OpenWrt firmware images for the Qualcomm IPQ807x platform, specifically targeting the Linksys MX4200v1 router. The build process incorporates various optimizations, hardening options, and quality-of-life enhancements. 
 
 ## Features
 
@@ -8,7 +8,7 @@ This project automates the process of building OpenWrt firmware images for the Q
 - Compiler optimizations for improved performance
 - Hardening build options for enhanced security
 - SSH configuration with strong algorithms and key exchange methods. Refer to the [`ssh_hardening.config`](files/etc/ssh/sshd_config.d/ssh_hardening.conf)
-- Additional useful packages. Refer to the [`ax3600.config`](ax3600.config)
+- Additional useful packages. Refer to the [`mx4200v1.config`](mx4200v1.config)
 - Full NSS (Network Subsystem) support 
 - Quality-of-life enhancements through UCI configuration
 
@@ -29,7 +29,7 @@ The build process is automated using GitHub Actions and consists of the followin
 
 ## Configuration
 
-The project utilizes a custom configuration file [`ax3600.config`](ax3600.config) to specify the desired settings for the firmware build. This file includes various options such as target platform, compiler optimizations, package selections, and more.
+The project utilizes a custom configuration file [`mx4200v1.config`](mx4200v1.config) to specify the desired settings for the firmware build. This file includes various options such as target platform, compiler optimizations, package selections, and more.
 
 Additionally, the `uci` commands in the "Quality-of-Life Enhancements" section are used to fine-tune the wireless and network settings for improved performance and functionality. Refer to the [999-QOL_config](https://github.com/JuliusBairaktaris/Qualcommax_NSS_Builder/blob/main/files/etc/uci-defaults/999-QOL_config) for the specific configuration. 
 
