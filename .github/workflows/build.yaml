@@ -1,4 +1,4 @@
-name: Build ImmortalWRT MX4200v1 (NSS) and Release
+name: Build ImmortalWRT MX4200v1 (NSS)
 
 on:
   workflow_dispatch:
@@ -70,31 +70,14 @@ jobs:
           # build (verbose output)
           make -j$(nproc) V=s 2>&1 | tee build.log
 
-      - name: Upload build artifacts to Actions
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: immortalwrt-mx4200-artifacts-${{ github.run_number }}
           path: immortalwrt/bin/targets/**
 
-      - name: Upload build log to Actions
+      - name: Upload build log
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ github.run_number }}
           path: immortalwrt/build.log
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        if: success()
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: ImmortalWRT MX4200v1 NSS Build #${{ github.run_number }}
-          body: |
-            Automated build of ImmortalWRT (NSS enabled) for Linksys MX4200v1.
-            Branch: openwrt-24.10-nss
-            Config: mx4200v1.config
-            Build run: ${{ github.run_number }}
-          files: |
-            immortalwrt/bin/targets/**/*.bin
-            immortalwrt/bin/targets/**/*.manifest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
