@@ -1,4 +1,4 @@
-name: Build ImmortalWRT (MX4200v1 + NSS)
+name: Build OpenWrt for specific target and release
 
 on:
   workflow_dispatch:
@@ -7,11 +7,13 @@ on:
     - cron: "0 */2 * * *"
 
 env:
-  REMOTE_REPOSITORY: Gaojianli/immortalwrt-ipq
-  REMOTE_BRANCH: openwrt-24.10-nss
+  REMOTE_REPOSITORY: qosmio/openwrt-ipq
+  REMOTE_BRANCH: 24.10-nss
   CONFIG_FILE: mx4200v1.config
   CUSTOM_FILES_PATH: files/
-  RELEASE_PREFIX: openwrt-24.10-nss
+  RELEASE_PREFIX: 24.10-nss
+  NSS_PACKAGES_REPOSITORY: qosmio/nss-packages
+  NSS_PACKAGES_REPOSITORY_BRANCH: NSS-12.5-K6.x
 
 jobs:
   check_commits:
@@ -20,35 +22,46 @@ jobs:
     outputs:
       new_commits: ${{ steps.check_commits.outputs.new_commits }}
       latest_commit_sha: ${{ steps.check_commits.outputs.latest_commit_sha }}
+      nss_packages_repo_new_commits: ${{ steps.check_commits.outputs.nss_packages_repo_new_commits }}
+      nss_packages_repo_latest_commit_sha: ${{ steps.check_commits.outputs.nss_packages_repo_latest_commit_sha }}
     steps:
-      - name: Check for new commits
+      - name: Check for new commits in both repositories
         id: check_commits
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Fetch latest commits and release info from branches
           latest_sha=$(gh api "repos/${{ env.REMOTE_REPOSITORY }}/commits/${{ env.REMOTE_BRANCH }}" --jq .sha)
+          packages_sha=$(gh api "repos/${{ env.NSS_PACKAGES_REPOSITORY }}/commits/${{ env.NSS_PACKAGES_REPOSITORY_BRANCH }}" --jq .sha)
+
+          # Try to get release body, handle case where it might not exist
           release_body=$(gh api "repos/${{ github.repository }}/releases/latest" --jq .body || echo "")
 
           echo "Latest upstream commit: $latest_sha"
+          echo "Latest packages commit: $packages_sha"
+
           if [ -n "$release_body" ]; then
-            echo "Release body contains latest commit: $(echo "$release_body" | grep -q "$latest_sha" && echo "Yes" || echo "No")"
+            echo "Release body contains latest base commit: $(echo "$release_body" | grep -q "$latest_sha" && echo "Yes" || echo "No")"
+            echo "Release body contains latest packages commit: $(echo "$release_body" | grep -q "$packages_sha" && echo "Yes" || echo "No")"
           else
             echo "No previous release body found"
           fi
 
           {
             echo "latest_commit_sha=$latest_sha"
-            if [ -z "$release_body" ] || [[ "$release_body" != *"$latest_sha"* ]]; then
-              echo "new_commits=true"
-            else
-              echo "new_commits=false"
+            echo "nss_packages_repo_latest_commit_sha=$packages_sha"
+            echo "new_commits=true"
+            echo "nss_packages_repo_new_commits=true"
+            if [ -n "$release_body" ]; then
+              echo "new_commits=$(if [[ "$release_body" != *"$latest_sha"* ]]; then echo true; else echo false; fi)"
+              echo "nss_packages_repo_new_commits=$(if [[ "$release_body" != *"$packages_sha"* ]]; then echo true; else echo false; fi)"
             fi
           } >> "$GITHUB_OUTPUT"
 
   build:
     name: Build OpenWrt
     needs: check_commits
-    if: github.event_name == 'workflow_dispatch' || needs.check_commits.outputs.new_commits == 'true'
+    if: github.event_name == 'workflow_dispatch' || needs.check_commits.outputs.new_commits == 'true' || needs.check_commits.outputs.nss_packages_repo_new_commits == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Install dependencies
@@ -73,8 +86,8 @@ jobs:
 
       - name: Add custom patches
         run: |
-          if [ -d builder_repo/patches ] && [ "$(ls -A builder_repo/patches)" ]; then
-            mv builder_repo/patches/* ./
+          if [ "$(ls builder_repo/patches)" ]; then
+            mv builder_repo/patches/* ./ || true
             for patch in *.patch; do
               git apply --verbose "$patch"
               echo "=== Diff after applying $patch ==="
@@ -97,7 +110,7 @@ jobs:
       - name: Include custom files
         run: |
           mkdir -p ${{ env.CUSTOM_FILES_PATH }}
-          mv builder_repo/${{ env.CUSTOM_FILES_PATH }}* ${{ env.CUSTOM_FILES_PATH }} || true
+          mv builder_repo/${{ env.CUSTOM_FILES_PATH }}* ${{ env.CUSTOM_FILES_PATH }}
 
       - name: Download dependencies
         run: make download V=s -j$(nproc)
@@ -109,7 +122,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ipq807x-images
-          path: bin/targets/qualcommax/ipq807x*
+          path: bin/targets/qualcommax/ipq807x
 
   release:
     name: Create release
@@ -122,21 +135,18 @@ jobs:
         with:
           name: ipq807x-images
           path: firmware
-
       - name: Display structure of downloaded files
-        run: ls -R firmware
-
+        run: ls -R
       - name: Get current date
         run: echo "RELEASE_DATE=$(date +%F)" >> $GITHUB_ENV
-
       - name: Create release
         uses: softprops/action-gh-release@master
         with:
           files: firmware/*
           tag_name: ${{ env.RELEASE_PREFIX }}-${{ env.RELEASE_DATE }}
-          name: 🚀 ImmortalWRT MX4200v1 NSS ${{ env.RELEASE_DATE }}
+          name: 🚀 OpenWrt Build Release ${{ env.RELEASE_DATE }}
           body: |
-            ## 📦 ImmortalWRT Automated Build Release
+            ## 📦 OpenWrt Automated Build Release
 
             **Build Date:** ${{ env.RELEASE_DATE }}
 
@@ -145,9 +155,14 @@ jobs:
             **Branch:** `${{ env.REMOTE_BRANCH }}`
             **Commit:** `${{ needs.check_commits.outputs.latest_commit_sha }}`
 
+            ### 📦 NSS Packages
+            **Repository:** [${{ env.NSS_PACKAGES_REPOSITORY }}](https://github.com/${{ env.NSS_PACKAGES_REPOSITORY }})
+            **Branch:** `${{ env.NSS_PACKAGES_REPOSITORY_BRANCH }}`
+            **Commit:** `${{ needs.check_commits.outputs.nss_packages_repo_latest_commit_sha }}`
+
             ### 📝 Build Information
-            - **Target:** Linksys MX4200v1
-            - **Configuration:** `${{ env.CONFIG_FILE }}`
+            - **Target:** [Linksys MX4200v1](https://openwrt.org/toh/linksys/mx4200_v1_and_v2)
+            - **Configuration:** [`${{ env.CONFIG_FILE }}`](${{ env.CONFIG_FILE }})
 
             ### 📋 Notes
             - Automated build triggered by ${{ github.event_name }}
