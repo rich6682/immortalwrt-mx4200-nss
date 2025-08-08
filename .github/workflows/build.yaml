@@ -35,9 +35,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ccache-
 
-      - name: Clone ImmortalWRT-IPQ (Gaojianli main-nss)
+      - name: Clone ImmortalWRT-IPQ (Gaojianli openwrt-24.10-nss)
         run: |
-          git clone --depth 1 -b main-nss https://github.com/Gaojianli/immortalwrt-ipq.git immortalwrt
+          git clone --depth 1 -b openwrt-24.10-nss https://github.com/Gaojianli/immortalwrt-ipq.git immortalwrt
 
       - name: Cache OpenWrt downloads (dl)
         uses: actions/cache@v4
